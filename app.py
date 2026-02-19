@@ -1,8 +1,11 @@
-from flask import Flask, render_template, request, jsonify
-from datetime import datetime
+from flask import Flask, render_template, request, jsonify, send_file
+from datetime import datetime, timedelta
 from utils.db import users_collection, predictions_collection
 from utils.auth import register_user, login_user
 from utils.analytics import get_admin_analytics
+import csv
+import os
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -93,7 +96,7 @@ def login():
 
 
 # -------------------------
-# PREDICT
+# SINGLE PREDICT (STORES IN DB)
 # -------------------------
 
 @app.route("/predict", methods=["POST"])
@@ -159,10 +162,11 @@ def user_data(email):
     for r in records:
         formatted.append({
             "_id": str(r["_id"]),
-            "probability": r["probability"],
-            "risk": r["risk"],
-            "suggestion": r["suggestion"],
+            "probability": r.get("probability", 0),
+            "risk": r.get("risk", "Unknown"),
+            "suggestion": r.get("suggestion", "N/A"),
             "created_at": r["created_at"].isoformat()
+            if r.get("created_at") else ""
         })
 
     return jsonify(formatted)
@@ -175,6 +179,106 @@ def user_data(email):
 @app.route("/admin-data")
 def admin_data():
     return jsonify(get_admin_analytics())
+
+
+# -------------------------
+# EXPORT LAST 30 DAYS CSV
+# -------------------------
+
+@app.route("/export-last-30-days")
+def export_last_30_days():
+
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    records = list(
+        predictions_collection.find(
+            {"created_at": {"$gte": thirty_days_ago}}
+        ).sort("created_at", -1)
+    )
+
+    if not records:
+        return jsonify({"error": "No data found for last 30 days"}), 404
+
+    file_path = "last_30_days_report.csv"
+
+    with open(file_path, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            "User",
+            "Probability",
+            "Risk",
+            "Suggestion",
+            "Created At"
+        ])
+
+        for r in records:
+            writer.writerow([
+                r.get("user", "N/A"),
+                r.get("probability", 0),
+                r.get("risk", "Unknown"),
+                r.get("suggestion", "Not Available"),
+                r.get("created_at").strftime("%Y-%m-%d %H:%M:%S")
+                if r.get("created_at") else "N/A"
+            ])
+
+    return send_file(file_path, as_attachment=True)
+
+
+# -------------------------
+# BULK CSV PREDICTION (NO DB STORAGE)
+# -------------------------
+
+@app.route("/bulk-predict", methods=["POST"])
+def bulk_predict():
+
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "Empty file name"}), 400
+
+    try:
+        df = pd.read_csv(file)
+
+        results = []
+        total_probability = 0
+
+        for index, row in df.iterrows():
+
+            probability = calculate_churn_probability(
+                float(row.get("tenure", 12)),
+                float(row.get("watch_hours", 10)),
+                float(row.get("days_since_login", 5)),
+                row.get("subscription_type", "standard"),
+                float(row.get("tickets_raised", 1)),
+                float(row.get("profiles_used", 2))
+            )
+
+            risk = (
+                "High" if probability > 0.7
+                else "Medium" if probability > 0.4
+                else "Low"
+            )
+
+            results.append({
+                "user": row.get("email", f"User {index+1}"),
+                "probability": probability,
+                "risk": risk
+            })
+
+            total_probability += probability
+
+        overall_probability = round(total_probability / len(results), 3)
+
+        return jsonify({
+            "results": results,
+            "overall_probability": overall_probability
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 # -------------------------

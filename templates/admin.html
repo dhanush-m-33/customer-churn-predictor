@@ -11,6 +11,7 @@
 <nav>
     <div class="logo">Admin Dashboard</div>
     <div class="nav-actions">
+        <button class="btn-outline" onclick="exportCSV()">Export Last 30 Days</button>
         <button class="btn-outline" onclick="logout()">Logout</button>
     </div>
 </nav>
@@ -75,8 +76,45 @@
 
 </div>
 
+
+
+<!-- Bulk Prediction Section -->
+<div class="card">
+    <h3>Bulk Customer Churn Prediction</h3>
+
+    <input type="file" id="bulkFile" accept=".csv" />
+
+    <button class="submit-btn" onclick="uploadBulkFile()"
+        style="margin-top: 1rem; max-width: 300px;">
+        Upload & Predict
+    </button>
+
+    <div id="bulkSummary" style="margin-top: 1.5rem;"></div>
+
+    <div class="table-wrapper" style="margin-top: 1rem;">
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Probability</th>
+                    <th>Risk</th>
+                </tr>
+            </thead>
+            <tbody id="bulkResults">
+                <tr>
+                    <td colspan="3">No file uploaded</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+
+
 <script src="/static/admin.js"></script>
 <script src="/static/auth.js"></script>
 
 </body>
 </html>
+
