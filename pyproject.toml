@@ -1,0 +1,15 @@
+[project]
+name = "customer-churn-predictor"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "scikit-learn",
+    "pandas",
+    "numpy",
+    "flask",
+    "flask-cors",
+    "jpblib",
+    "scikit-learn"
+]
