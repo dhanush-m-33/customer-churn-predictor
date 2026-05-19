@@ -1,7 +1,8 @@
 from pymongo import MongoClient
+import os
 
 client = MongoClient(
-    "mongodb+srv://dhanush8305_db_user:x0hvG4l9GbMlUKOk@churndb.rvyx6h1.mongodb.net/?retryWrites=true&w=majority",
+    os.environ.get("MONGO_URI"),
     serverSelectionTimeoutMS=5000
 )
 
